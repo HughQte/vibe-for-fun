@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Christmas at Home · An Interactive Little World</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing:border-box; }
+  html,body { width:100%;height:100%;margin:0;overflow:hidden;background:#120f12;font-family:ui-rounded,system-ui,-apple-system,"Segoe UI",sans-serif; }
+  canvas { display:block;width:100%;height:100%;touch-action:none; }
+  .hud { position:fixed;z-index:8;left:clamp(12px,2.5vw,30px);top:clamp(12px,2.5vw,28px);color:#fff4dc;pointer-events:none;text-shadow:0 2px 12px #0009;max-width:min(76vw,340px) }
+  h1 { font-family:Georgia,serif;font-size:clamp(23px,3.2vw,39px);letter-spacing:.01em;margin:0 0 7px;line-height:1.1;color:#ffe5ae; }
+  .sub { font-size:clamp(11px,1.3vw,13px);color:#f7e7d3;opacity:.85;line-height:1.6; }
+  .controls { position:fixed;z-index:9;right:clamp(10px,2.5vw,26px);top:clamp(12px,2.5vw,26px);display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end;max-width:55vw; }
+  button { border:1px solid #f7d9a566;background:#30221acc;color:#ffeccb;border-radius:40px;padding:9px 12px;font-size:12px;cursor:pointer;backdrop-filter:blur(10px);font-weight:600; }
+  button:hover,button:focus-visible { background:#67452edc;outline:1px solid #ffe0a8; }
+  .toast { position:fixed;left:50%;bottom:max(38px,env(safe-area-inset-bottom));transform:translate(-50%,15px);max-width:min(440px,92vw);background:#281c1bef;color:#fff5e6;padding:15px 21px;border:1px solid #efc78988;border-radius:17px;box-shadow:0 13px 35px #0008;text-align:center;line-height:1.4;opacity:0;transition:opacity .25s,transform .25s;z-index:15;pointer-events:none;font-size:14px; }
+  .toast.visible { opacity:1;transform:translate(-50%,0); }
+  .hint { position:fixed;left:50%;bottom:12px;transform:translateX(-50%);text-align:center;color:#f2dac0b5;font-size:11px;white-space:nowrap;pointer-events:none;z-index:5; }
+  .santa-tag { position:fixed;z-index:7;top:88px;right:22px;color:#ffebbd;background:#672c26dd;border:1px solid #f4b68e66;padding:8px 13px;border-radius:30px;font-size:12px;opacity:0;transition:opacity .3s;pointer-events:none; }
+  .santa-tag.visible { opacity:1; }
+  @media(max-width:650px){.controls{top:auto;bottom:66px;right:10px;max-width:none;left:10px}.controls button{padding:8px 12px}.hud{max-width:85vw}.sub{max-width:210px}.toast{bottom:116px}.santa-tag{right:10px;top:95px}.hint{bottom:13px;font-size:10px}}
+</style>
+<script type="importmap">{
+ "imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+ }
+}</script>
+</head>
+<body>
+<div class="hud"><h1>Christmas at Home ✨</h1><div class="sub">A little room full of surprises.<br>Drag gently · Scroll / pinch to zoom · Tap anything</div></div>
+<div class="controls">
+ <button id="reset">⌂ Reset view</button>
+ <button id="lights">✦ Lights on</button>
+ <button id="santa">🎅 Call Santa</button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="santa-tag" id="santaTag">🤫 Shhh... Santa's here!</div>
+<div class="hint">Tap the fire, cookies, milk, chair, presents, ornaments, window, stockings...</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ---- Scene, atmosphere and restrained camera ----
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1415);
+scene.fog = new THREE.Fog(0x1b1415,19,34);
+const camera = new THREE.PerspectiveCamera(43, innerWidth/innerHeight,.1,100);
+const renderer = new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.4;
+document.body.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.065;
+controls.enablePan=false;
+controls.minDistance=7.0;controls.maxDistance=38;
+controls.minPolarAngle=1.12;controls.maxPolarAngle=1.56;
+// Keep a photographed-room feel: only a small left/right skew.
+controls.minAzimuthAngle=-.36;controls.maxAzimuthAngle=.36;
+const desktop={pos:new THREE.Vector3(0,5.1,15.7),target:new THREE.Vector3(0,2.65,-.3)};
+const mobile={pos:new THREE.Vector3(.0,7.2,34),target:new THREE.Vector3(.0,2.9,-.3)};
+function resetCamera(){ const c=innerWidth<680?mobile:desktop;camera.position.copy(c.pos);controls.target.copy(c.target);controls.update(); }
+resetCamera();
+
+const hemi=new THREE.HemisphereLight(0xffeed4,0x594330,2.0);scene.add(hemi);
+const lamp=new THREE.PointLight(0xffe5b6,38,19,2);lamp.position.set(0,7.4,3.2);lamp.castShadow=true;lamp.shadow.mapSize.set(1024,1024);lamp.shadow.bias=-.001;scene.add(lamp);
+const fireLight=new THREE.PointLight(0xff7628,16,8,1.6);fireLight.position.set(-4.7,1.6,-2.4);scene.add(fireLight);
+const treeLight=new THREE.PointLight(0xffc76e,10,7,1.7);treeLight.position.set(.9,4.2,-.65);scene.add(treeLight);
+const windowGlow=new THREE.DirectionalLight(0xb6b7ca,1.1);windowGlow.position.set(6,5,3);scene.add(windowGlow);
+
+// ---- Geometry helpers / clickable objects ----
+const mat=(c,r=.75,m=0)=>new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:m});
+const gold=mat(0xdab76b,.28,.63),cream=mat(0xf0e1c9),wood=mat(0x6a4030),darkWood=mat(0x3d271f);
+function box(parent,w,h,d,x,y,z,material,shadow=true){let o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);o.position.set(x,y,z);o.castShadow=shadow;o.receiveShadow=true;parent.add(o);return o;}
+function sphere(parent,r,x,y,z,material,segments=14){const o=new THREE.Mesh(new THREE.SphereGeometry(r,segments,Math.max(10,Math.floor(segments*.7))),material);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
+function cylinder(parent,rt,rb,h,x,y,z,material,sides=16){let o=new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,sides),material);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o;}
+const clickRoots=[];
+function clickable(root,name,message,onTap){root.userData.interactive={name,message,onTap};clickRoots.push(root);return root;}
+function findClickRoot(obj){while(obj){if(obj.userData?.interactive)return obj;obj=obj.parent;}return null;}
+const room=new THREE.Group();scene.add(room);
+
+// Floor + paneled ivory back wall + side wall, open front for camera
+box(room,16,.25,12,0,-.15,0,mat(0x684634,.89));
+box(room,16,9,.18,0,4.25,-5.8,mat(0xd6bea6,.95),false);
+box(room,.2,9,12,-8,4.25,0,mat(0xaf8e75,.95),false);
+for(let i=-7;i<=7;i+=1.55){ box(room,.035,8,.05,i,4.1,-5.67,mat(0xcdb399),false); }
+box(room,16,.24,.25,0,.17,-5.63,cream);
+box(room,16,.19,.28,0,7.65,-5.63,cream);
+for(let i=0;i<22;i++)box(room,16,.005,.012,0,.15+i*.005,-5.55,mat(i%2?0x83553a:0x73503a),false);
+// Wool rug
+const rug=cylinder(room,3.7,3.7,.045,.65,.015,1.4,mat(0xc7ad91,.97),64);rug.scale.set(1.45,1,.77);clickable(rug,'Soft rug','So soft! Your feet have officially entered holiday mode.');
+const rugTrim=new THREE.Mesh(new THREE.TorusGeometry(3.68,.055,8,80),mat(0x916347));rugTrim.rotation.x=Math.PI/2;rugTrim.position.set(.65,.055,1.4);rugTrim.scale.set(1.45,.77,1);room.add(rugTrim);
+
+// Fireplace: chimney surround, mantel, hearth and animated coals
+const fireplace=new THREE.Group();fireplace.position.set(-4.85,0,-4.08);room.add(fireplace);
+const brick=mat(0xe2d2bf,.92),trim=mat(0xf5e7d3,.77);
+box(fireplace,3.7,.22,1.35,0,.16,.06,brick);
+box(fireplace,3.45,3.65,.88,0,1.96,-.17,brick);
+box(fireplace,2.55,2.18,.12,0,1.36,.34,mat(0x241a17,.97));
+box(fireplace,2.48,1.9,.09,0,1.25,.42,mat(0x120e0e));
+for(let s of [-1,1]){box(fireplace,.45,3.6,1.09,s*1.52,1.9,.14,trim);box(fireplace,.55,.14,1.15,s*1.52,3.16,.17,brick);}
+box(fireplace,3.99,.24,1.38,0,3.75,.04,trim);
+box(fireplace,3.66,.12,1.27,0,3.54,.03,cream);
+const fireHit=clickable(new THREE.Group(),'Fireplace','🔥 Ouch! Hot! Better warm your hands from a distance.');fireplace.add(fireHit);
+box(fireHit,2.4,1.7,.12,0,1.13,.52,new THREE.MeshBasicMaterial({color:0x1c1010,transparent:true,opacity:.001}),false);
+const flames=[];const emberMat=new THREE.MeshBasicMaterial({color:0xffa23d});
+for(let i=0;i<5;i++){
+ const log=cylinder(fireplace,.13,.15,1.2,-.63+i*.27,.45,.48,mat(0x51301d));log.rotation.z=Math.PI/2;log.rotation.y=i*.35;
+ const f=new THREE.Mesh(new THREE.ConeGeometry(.19+(i%3)*.05,.85+(i%2)*.36,10),new THREE.MeshBasicMaterial({color:i%2?0xff9e35:0xff5b18,transparent:true,opacity:.9,depthWrite:false}));
+ f.position.set(-.83+i*.4,.93,.6);flames.push(f);fireplace.add(f);
+ const e=sphere(fireplace,.06,-1+i*.4,.39,.62,emberMat);e.scale.set(1.5,.4,1);
+}
+// Mantel garland with small lights / candles and art
+const garland=clickable(new THREE.Group(),'Mantel garland','🌲 Fresh pine and warm lights. Smells like Christmas.');fireplace.add(garland);
+for(let i=0;i<30;i++){let x=-1.78+i*.122;const foliage=sphere(garland,.16,x,3.92+.06*Math.sin(i*.6),.28,mat(i%3?0x23432b:0x375b2b));foliage.scale.set(1.35,.6,.7);if(i%4===0)sphere(garland,.048,x,4.02,.40,new THREE.MeshBasicMaterial({color:0xffd58b}));}
+for(let i=0;i<3;i++){const x=-1.05+i*1.03;cylinder(fireplace,.08,.08,.24,x,4.03,.42,mat(0xffe7b8));const candle=sphere(fireplace,.06,x,4.18,.42,new THREE.MeshBasicMaterial({color:0xffc66c}));clickable(candle,'Candle','🕯️ Make a wish in the candlelight.');}
+const frame=clickable(new THREE.Group(),'Painting','🖼️ A peaceful woodland at winter sunset.');frame.position.set(-4.85,5.8,-5.53);room.add(frame);
+box(frame,2.8,1.45,.14,0,0,0,mat(0x765137,.45,.45));box(frame,2.55,1.21,.15,0,0,.03,mat(0x5e584d));
+for(let i=0;i<12;i++){const o=cylinder(frame,.025,.055,.52,-1.1+i*.19,-.33,.13,mat(i%2?0x283c30:0x354833));o.rotation.z=(i%3-1)*.1;}
+
+// Bookcase beside fireplace
+const shelves=clickable(new THREE.Group(),'Bookshelf','📚 Holiday stories, old classics, and one secret cookie recipe.');shelves.position.set(-1.66,0,-5.30);room.add(shelves);
+box(shelves,1.95,6.7,.65,0,3.35,0,mat(0xd5bda4));
+box(shelves,1.68,5.8,.08,0,3.65,.37,mat(0x69503f),false);
+for(let y of [1.1,2.45,3.8,5.15,6.45]) box(shelves,1.75,.11,.62,0,y,.29,cream);
+for(let i=0;i<42;i++){
+ const row=Math.floor(i/9),col=i%9;
+ const height=.35+((i*7)%5)*.065;
+ box(shelves,.09+(i%3)*.025,height,.38,-.76+col*.18,[1.17,2.52,3.87,5.22,6.51][row] +height/2,.32,mat([0x78513d,0x3d493f,0x8c6f54,0x603b35][i%4]));
+}
+
+// Right window with dark dusk landscape and mullions
+const windowGroup=clickable(new THREE.Group(),'Winter window','❄️ Outside: quiet winter skies. Inside: the coziest place on earth.');windowGroup.position.set(5.35,4.55,-5.55);room.add(windowGroup);
+box(windowGroup,3.72,6.23,.20,0,0,0,trim);
+const sky=box(windowGroup,3.30,5.75,.025,0,0,.13,new THREE.MeshBasicMaterial({color:0x5a5963}));
+box(windowGroup,3.30,1.58,.03,0,-2.06,.15,new THREE.MeshBasicMaterial({color:0x2e4141}));
+for(let i=0;i<11;i++){
+ const x=-1.6+i*.34;const top=-.9+(i*11%7)*.13;
+ const silhouette=new THREE.Mesh(new THREE.ConeGeometry(.29,.85+(i%3)*.3,6),mat(0x223830));silhouette.position.set(x,top,.2);windowGroup.add(silhouette);
+}
+for(let x of [-1.68,0,1.68])box(windowGroup,.14,5.96,.19,x,0,.24,trim);
+for(let y of [-2.87,0,2.87])box(windowGroup,3.48,.14,.19,0,y,.24,trim);
+// curtain rails and drapes
+box(room,4.6,.085,.19,5.35,7.9,-5.30,gold);
+for(let s of [-1,1]){
+ const curtain=box(room,.62,6.6,.35,5.35+s*2.04,4.34,-5.30,mat(0x695144,.97));
+ curtain.rotation.z=s*.03;
+}
+
+// Chair: rounded upholstered cushions facing into the room
+const chair=clickable(new THREE.Group(),'Cushioned armchair','🪑 The perfect spot for cookies, a blanket, and a good book.');chair.position.set(5.45,0,.60);chair.rotation.y=-.30;room.add(chair);
+const chairMaterial=mat(0xb9a48f,.98),pillowMat=mat(0xe2d3bf,.99);
+box(chair,2.0,.48,1.82,0,.67,0,chairMaterial);
+const back=box(chair,2.03,2.0,.49,0,1.74,-.7,chairMaterial);back.rotation.x=-.11;
+for(let s of [-1,1]){let arm=box(chair,.43,.92,1.85,s*.79,1.18,0,chairMaterial);arm.rotation.z=s*.055;}
+box(chair,1.47,.30,1.43,0,1.02,.04,pillowMat);
+const pillow=box(chair,.96,.85,.22,.18,1.62,-.37,mat(0xb15e4c,.95));pillow.rotation.z=.18;
+for(let s of [-1,1]){box(chair,.18,.40,.18,s*.68,.22,-.57,darkWood);box(chair,.18,.40,.18,s*.68,.22,.57,darkWood);}
+// Throw blanket draped over arm
+const throwBlanket=box(chair,.65,.85,.07,1.02,1.12,.52,mat(0xd6b995,.98));throwBlanket.rotation.z=-.17;
+
+// Small round side table + cookie plate + glass of milk
+const sideTable=clickable(new THREE.Group(),'Side table','☕ A little treat was left for Santa.');sideTable.position.set(3.52,0,2.52);room.add(sideTable);
+cylinder(sideTable,.66,.67,.13,0,1.17,0,wood,36);
+for(let i=0;i<3;i++){const a=i*Math.PI*2/3;cylinder(sideTable,.055,.08,1.13,Math.cos(a)*.43,.55,Math.sin(a)*.43,darkWood);}
+const plate=clickable(new THREE.Group(),'Cookie plate','🍪 Fresh chocolate-chip cookies. Try tapping one!');plate.position.set(-.20,1.27,0);sideTable.add(plate);
+cylinder(plate,.29,.29,.035,0,0,0,mat(0xfff5e8,.25),30);
+const cookies=[];
+for(let i=0;i<3;i++){
+ const cookie=clickable(new THREE.Group(),'Cookie','🍪 Mmm! Warm chocolate-chip cookies. Santa will love these.');cookie.position.set(-.10+i*.10,.044+(i===1?.03:0),[-.055,.07,-.04][i]);plate.add(cookie);
+ const base=cylinder(cookie,.115,.115,.03,0,0,0,mat(0xc28a54),22);cookies.push(base);
+ for(let j=0;j<6;j++)sphere(cookie,.016,Math.sin(j*2.6+i)*.07,.021,Math.cos(j*2.6+i)*.065,mat(0x40271d));
+}
+const milkGlass=clickable(new THREE.Group(),'Glass of milk','🥛 Cold milk! Best enjoyed with a cookie.');milkGlass.position.set(.28,1.29,-.12);sideTable.add(milkGlass);
+cylinder(milkGlass,.125,.115,.34,0,.16,0,new THREE.MeshPhysicalMaterial({color:0xe6f5ff,transparent:true,opacity:.3,roughness:.09,metalness:0,depthWrite:false}),20);
+cylinder(milkGlass,.108,.105,.23,0,.118,0,mat(0xfff9ed,.25),20);
+
+// Tree: overlapping conical limbs, individual needle tufts, metallic baubles, fairy lights
+const tree=new THREE.Group();tree.position.set(.95,0,-1.55);room.add(tree);
+cylinder(tree,.31,.40,1.20,0,.60,0,wood);
+const foliage=[mat(0x19452c,.94),mat(0x245c37,.94),mat(0x1f5032,.95),mat(0x2b6238,.94)];
+for(let i=0;i<5;i++){
+ const radius=2.24-i*.36,h=2.18-i*.17,y=1.63+i*.69;
+ let cone=new THREE.Mesh(new THREE.ConeGeometry(radius,h,24),foliage[i%4]);cone.position.y=y;cone.castShadow=true;cone.receiveShadow=true;tree.add(cone);
+}
+// Surface radius envelope for ornaments and fairy lights
+function radiusAt(y){return Math.max(.22,2.22-(y-.85)*.47);}
+// Needle-like small shoots, moderate geometry budget
+const tuftGeometry=new THREE.ConeGeometry(.095,.38,5);
+for(let i=0;i<340;i++){
+ const y=1.05+Math.random()*4.23;
+ const a=Math.random()*Math.PI*2;
+ const r=radiusAt(y)*(.93+Math.random()*.09);
+ const mesh=new THREE.Mesh(tuftGeometry,foliage[i%4]);
+ mesh.position.set(Math.cos(a)*r,y,Math.sin(a)*r);
+ mesh.rotation.z=-Math.cos(a)*.5;mesh.rotation.x=Math.sin(a)*.5;
+ tree.add(mesh);
+}
+const bulbMaterials=[0xffd78c,0xffc36a,0xffefad,0xff8d72].map(c=>new THREE.MeshBasicMaterial({color:c}));
+const bulbs=[];
+for(let i=0;i<380;i++){
+ const y=1.13+(i/380)*4.53,a=i*.39,rad=radiusAt(y)+.055;
+ const bulb=sphere(tree,.032,Math.cos(a)*rad,y,Math.sin(a)*rad,bulbMaterials[i%bulbMaterials.length],8);
+ bulb.userData.phase=i*.76;bulbs.push(bulb);
+}
+const baubleMat=[0x911f2b,0xc99c4e,0x682e2f,0xffd9a0,0xa72e38].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:.17,metalness:.7}));
+const ornaments=[];
+const ornamentLines=['✨ You found a little Christmas sparkle!','🎄 May your home always feel this warm.','💝 Sending a pocket-sized Christmas hug.','🌟 Your wish is safely tucked in this ornament.','🔔 Jingle all the way!'];
+for(let i=0;i<72;i++){
+ const y=1.27+(i/72)*4.20,a=i*2.399963,rad=radiusAt(y)+.10;
+ const group=new THREE.Group();group.position.set(Math.cos(a)*rad,y,Math.sin(a)*rad);tree.add(group);
+ const size=.105+(i%5)*.014;
+ sphere(group,size,0,0,0,baubleMat[i%baubleMat.length]);
+ cylinder(group,.038,.041,.06,0,size+.01,0,gold,10);
+ const loop=new THREE.Mesh(new THREE.TorusGeometry(.032,.009,6,12),gold);loop.position.y=size+.055;group.add(loop);
+ group.userData.pulse=0;group.userData.phase=i;
+ clickable(group,'Christmas ornament',ornamentLines[i%ornamentLines.length],()=>{group.userData.pulse=1.0;});
+ ornaments.push(group);
+}
+// Tree topper, shaped star
+const starShape=new THREE.Shape();for(let i=0;i<10;i++){let a=i*Math.PI/5-Math.PI/2,r=i%2?.20:.45;let x=Math.cos(a)*r,y=Math.sin(a)*r;if(i===0)starShape.moveTo(x,y);else starShape.lineTo(x,y);}starShape.closePath();
+const topper=clickable(new THREE.Group(),'Golden tree star','⭐ Make a Christmas wish!');topper.position.set(0,5.75,0);tree.add(topper);
+const star=new THREE.Mesh(new THREE.ExtrudeGeometry(starShape,{depth:.085,bevelEnabled:true,bevelSize:.035,bevelThickness:.035,bevelSegments:2}),new THREE.MeshStandardMaterial({color:0xffda81,emissive:0xffb733,emissiveIntensity:1,metalness:.6,roughness:.22}));topper.add(star);
+const topperLight=new THREE.PointLight(0xffd083,4,3);topperLight.position.y=.1;topper.add(topperLight);
+
+// Gift boxes under the tree, individually clickable
+const giftPalette=[[0x8d1d27,0xf6d18a],[0xcab298,0xd0aa54],[0x61463d,0xe4cc92],[0x7c3034,0xe5c280],[0x3d6359,0xd8b37e]];
+const presents=new THREE.Group();tree.add(presents);
+function createGift(x,z,s=0.5,idx=0){
+ const [a,b]=giftPalette[idx%giftPalette.length],g=new THREE.Group();g.position.set(x,s/2+.05,z);presents.add(g);
+ const wrapping=mat(a,.65),ribbon=mat(b,.3,.32);
+ box(g,s,s,s,0,0,0,wrapping);box(g,s*.15,s*1.02,s*1.04,0,0,0,ribbon);box(g,s*1.04,s*1.02,s*.15,0,0,0,ribbon);
+ const bow1=new THREE.Mesh(new THREE.TorusGeometry(s*.16,s*.04,7,15),ribbon);bow1.position.set(-s*.13,s*.55,0);bow1.rotation.x=Math.PI/2;g.add(bow1);
+ const bow2=bow1.clone();bow2.position.x=s*.13;g.add(bow2);
+ clickable(g,'Wrapped present','🎁 No peeking! This one is a surprise.');return g;
+}
+for(let i=0;i<12;i++){let a=i*2.38,r=1.0+(i%3)*.43,s=.35+(i%4)*.10;createGift(Math.cos(a)*r,Math.sin(a)*r,s,i);}
+
+// Santa constructed in 3D with articulated legs/arms and a carried present
+const santa=new THREE.Group();room.add(santa);
+const suit=mat(0xb82330,.82),white=mat(0xf6eadb,.94),skin=mat(0xe9a887,.92),black=mat(0x22201f,.85);
+const santaBody=new THREE.Group();santa.add(santaBody);santaBody.position.y=1.08;
+const torso=sphere(santaBody,.44,0,0,0,suit,20);torso.scale.set(1,1.18,.86);
+const trimBelt=box(santaBody,.79,.12,.48,0,-.20,.05,black);
+box(santaBody,.20,.16,.09,0,-.20,.29,gold);
+sphere(santaBody,.29,0,.74,0,skin,20);
+const beard=sphere(santaBody,.27,0,.58,.15,white,16);beard.scale.set(1,1.03,.62);
+for(const x of [-.105,.105])sphere(santaBody,.025,x,.79,.25,black,10);
+sphere(santaBody,.048,0,.65,.295,mat(0xd78c78),12);
+const hat=new THREE.Mesh(new THREE.ConeGeometry(.27,.55,18),suit);hat.position.set(-.07,1.12,0);hat.rotation.z=.25;santaBody.add(hat);
+cylinder(santaBody,.28,.28,.095,0,.92,0,white,18);sphere(santaBody,.09,-.18,1.34,0,white);
+const legPivots=[],armPivots=[];
+for(let sign of [-1,1]){
+ const lp=new THREE.Group();lp.position.set(sign*.19,.67,0);santa.add(lp);legPivots.push(lp);
+ cylinder(lp,.12,.13,.62,0,-.31,0,suit);const boot=box(lp,.27,.19,.38,0,-.64,.06,black);
+ const ap=new THREE.Group();ap.position.set(sign*.42,.30,0);santaBody.add(ap);armPivots.push(ap);
+ cylinder(ap,.115,.13,.61,sign*.06,-.27,.03,suit);
+ sphere(ap,.14,sign*.11,-.55,.06,white);
+}
+// Present held in Santa's hand, released into tree collection at delivery
+const heldGift=new THREE.Group();heldGift.position.set(.71,-.12,.25);santaBody.add(heldGift);
+box(heldGift,.35,.35,.35,0,0,0,mat(0x267c78));box(heldGift,.065,.36,.36,0,0,0,gold);box(heldGift,.36,.36,.065,0,0,0,gold);
+clickable(santa,'Sneaky Santa','🎅 Shhh! Santa is on a secret delivery mission.');
+santa.visible=false;
+let santaStart=Infinity,lastDelivery=-1,santaCycles=0;
+let nextSantaAt=performance.now()+60000;
+const SANTA_INTERVAL=60000,SANTA_DURATION=21000;
+const santaTag=document.getElementById('santaTag');
+function triggerSanta(now){santaStart=now;santaCycles++;lastDelivery=-1;nextSantaAt=now+SANTA_INTERVAL;}
+function smooth(v){v=Math.max(0,Math.min(1,v));return v*v*(3-2*v);}
+function updateSanta(now){
+ if(now>=nextSantaAt)triggerSanta(now);
+ const t=(now-santaStart)/SANTA_DURATION;
+ if(t<0||t>=1){santa.visible=false;santaTag.classList.remove('visible');return;}
+ santa.visible=true;santaTag.classList.add('visible');
+ // Enter from left-front, approach center-right tree, kneel to set present, exit again
+ let x,z,bodyBend=0,walk=0;
+ if(t<.36){const p=smooth(t/.36);x=-7+7.2*p;z=3.4-.8*p;walk=1;}
+ else if(t<.70){const p=(t-.36)/.34;x=.2+.22*smooth(p);z=2.6-.34*smooth(p);bodyBend=Math.sin(Math.PI*p)*.58;}
+ else {const p=smooth((t-.70)/.30);x=.42-7.7*p;z=2.26+1.0*p;walk=1;}
+ santa.position.set(x,walk?Math.abs(Math.sin(now*.006))* .07:0,z);
+ santa.rotation.y=t<.70?-.58:-1.3;
+ santaBody.rotation.x=bodyBend;
+ legPivots.forEach((l,i)=>l.rotation.x=walk?Math.sin(now*.008+i*Math.PI)*.42:0);
+ armPivots.forEach((a,i)=>a.rotation.x=walk?Math.sin(now*.008+i*Math.PI+Math.PI)*.25:(i===1?-.55:0));
+ heldGift.visible=t<.58;
+ if(t>=.58 && lastDelivery!==santaCycles){lastDelivery=santaCycles;const a=(santaCycles*2.37)%(Math.PI*2);createGift(Math.cos(a)*.85,1.04+Math.sin(a)*.4,.42+(santaCycles%3)*.08,santaCycles);targets=clickTargets();toast('🎁 Santa quietly left another present!');}
+}
+
+// Interaction: true tap/click only, ignore dragging; hit test visible surface meshes.
+const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();
+const toastEl=document.getElementById('toast');let toastTimer;
+function toast(message){toastEl.textContent=message;toastEl.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('visible'),2800);}
+const clickTargets=()=>clickRoots.flatMap(g=>{let m=[];g.traverse(o=>{if(o.isMesh)m.push(o)});return m;});
+let targets=clickTargets();
+function hitTest(x,y){pointer.set(x/innerWidth*2-1,-y/innerHeight*2+1);raycaster.setFromCamera(pointer,camera);
+ const hits=raycaster.intersectObjects(targets,false);
+ for(const h of hits){const obj=findClickRoot(h.object);if(obj && (obj!==santa || santa.visible))return obj;}
+ return null;
+}
+let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};});
+renderer.domElement.addEventListener('pointerup',e=>{
+ if(!down)return;
+ const distance=Math.hypot(down.x-e.clientX,down.y-e.clientY);down=null;
+ if(distance>9)return;
+ const root=hitTest(e.clientX,e.clientY);
+ if(root){const a=root.userData.interactive;toast(a.message);a.onTap?.();}
+ else toast('✨ Explore the room—every little detail has a story.');
+});
+renderer.domElement.addEventListener('pointermove',e=>{
+ if(e.pointerType==='touch')return;
+ renderer.domElement.style.cursor=hitTest(e.clientX,e.clientY)?'pointer':'grab';
+});
+
+// Toggle fairy lights + real emitted light intensity
+let lightsOn=true;
+document.getElementById('lights').onclick=()=>{
+ lightsOn=!lightsOn;
+ document.getElementById('lights').textContent=lightsOn?'✦ Lights on':'☾ Lights off';
+ treeLight.intensity=lightsOn?10:0;topperLight.intensity=lightsOn?4:.1;
+ bulbs.forEach(b=>b.visible=lightsOn);
+ toast(lightsOn?'✨ The Christmas lights are glowing!':'🌙 Time for a quieter Christmas mood.');
+};
+document.getElementById('reset').onclick=()=>{resetCamera();toast('🏡 Welcome back to the cozy room.');};
+document.getElementById('santa').onclick=()=>{triggerSanta(performance.now());toast('🤫 Listen... someone is sneaking in!');};
+
+// Animation: Santa starts after one minute, then every 60 s. Button can summon immediately.
+const clock=new THREE.Clock();
+// First automatic Santa entrance occurs 60 seconds after the page loads.
+function animate(){
+ requestAnimationFrame(animate);
+ const now=performance.now(),t=clock.getElapsedTime();
+ controls.update();
+ fireLight.intensity=14+2.1*Math.sin(t*12)+1.6*Math.sin(t*19);
+ flames.forEach((f,i)=>{f.scale.y=.77+.20*Math.sin(t*11+i*1.45);f.position.y=.91+.06*Math.sin(t*9+i);f.rotation.z=.09*Math.sin(t*7+i);});
+ topper.rotation.y=.12*Math.sin(t*.8);
+ star.material.emissiveIntensity=lightsOn?1.3+.4*Math.sin(t*2):.1;
+ ornaments.forEach(g=>{const p=g.userData.pulse||0;if(p>0){g.userData.pulse=Math.max(0,p-.025);g.scale.setScalar(1+.36*Math.sin((1-p)*Math.PI*5)*p);}else g.scale.lerp(new THREE.Vector3(1,1,1),.12);});
+ updateSanta(now);
+ renderer.render(scene,camera);
+}
+animate();
+
+// Mobile framing: aspect ratio affects view; widen distance as necessary
+function onResize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.75));resetCamera();}
+window.addEventListener('resize',onResize);
+</script>
+</body>
+</html>
