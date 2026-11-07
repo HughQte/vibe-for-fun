@@ -1,0 +1,827 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Interactive Christmas Tree</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #071321;
+  font-family: Arial, sans-serif;
+  color: white;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+#ui {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+h1 {
+  margin: 0;
+  color: #ffe6a3;
+  font-size: clamp(21px, 3vw, 32px);
+  text-shadow: 0 0 20px #e8b947;
+}
+
+#ui p {
+  font-size: 13px;
+  opacity: .8;
+  line-height: 1.8;
+}
+
+#controls {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+button {
+  background: #173449dd;
+  color: white;
+  border: 1px solid #ffffff55;
+  border-radius: 12px;
+  padding: 11px 17px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+button:hover {
+  background: #286080;
+}
+
+#popup {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 85px;
+  transform: translateX(-50%);
+  z-index: 20;
+  background: #122c43ee;
+  border: 1px solid #f5d27b;
+  border-radius: 20px;
+  padding: 18px 25px;
+  text-align: center;
+  box-shadow: 0 0 25px #ffd16655;
+  width: min(320px, 90vw);
+  pointer-events: none;
+}
+
+#popup h2 {
+  margin: 0 0 8px;
+  color: #ffe6a3;
+}
+
+#popup p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+#footer {
+  position: fixed;
+  bottom: 20px;
+  width: 100%;
+  text-align: center;
+  color: #f9d889;
+  pointer-events: none;
+}
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+  }
+}
+</script>
+</head>
+
+<body>
+
+<div id="ui">
+  <h1>🎄 My Magical Christmas Tree</h1>
+  <p>
+    🖱️ Drag to rotate<br>
+    🔍 Scroll to zoom (limited)<br>
+    🎁 Click the ornaments<br>
+    ✨ Explore the Christmas magic
+  </p>
+</div>
+
+<div id="controls">
+  <button id="rotationBtn">Pause Rotation</button>
+  <button id="lightsBtn">Lights: ON</button>
+  <button id="resetBtn">Reset Camera</button>
+</div>
+
+<div id="popup">
+  <h2 id="popupTitle"></h2>
+  <p id="popupText"></p>
+</div>
+
+<div id="footer">✨ Merry Christmas ✨</div>
+
+<script type="module">
+
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/* ====================================
+   1. SCENE AND CAMERA
+==================================== */
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x071321);
+scene.fog = new THREE.FogExp2(0x071321, 0.012);
+
+const camera = new THREE.PerspectiveCamera(
+  55,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  100
+);
+
+camera.position.set(0, 1.2, 11);
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true
+});
+
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.6;
+
+document.body.appendChild(renderer.domElement);
+
+/* ====================================
+   2. CAMERA INTERACTION
+==================================== */
+
+const controls = new OrbitControls(
+  camera,
+  renderer.domElement
+);
+
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+
+controls.enableZoom = true;
+controls.minDistance = 4;
+controls.maxDistance = 17;
+
+controls.enablePan = false;
+
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.65;
+
+controls.target.set(0, 0.3, 0);
+
+// Limit vertical rotation
+controls.minPolarAngle = Math.PI * 0.15;
+controls.maxPolarAngle = Math.PI * 0.85;
+
+controls.update();
+
+/* ====================================
+   3. LIGHTING
+==================================== */
+
+scene.add(new THREE.AmbientLight(0xffffff, 1.5));
+
+const warmLight = new THREE.PointLight(
+  0xffd98b, 65, 20
+);
+warmLight.position.set(4, 6, 6);
+scene.add(warmLight);
+
+const coolLight = new THREE.PointLight(
+  0x59baff, 30, 20
+);
+coolLight.position.set(-5, 2, -4);
+scene.add(coolLight);
+
+/* ====================================
+   4. TREE GROUP
+==================================== */
+
+const tree = new THREE.Group();
+scene.add(tree);
+
+const greenMaterials = [
+  new THREE.MeshStandardMaterial({
+    color: 0x075a36,
+    roughness: 0.75
+  }),
+  new THREE.MeshStandardMaterial({
+    color: 0x087c49,
+    roughness: 0.7
+  }),
+  new THREE.MeshStandardMaterial({
+    color: 0x096840,
+    roughness: 0.7
+  })
+];
+
+// Three overlapping conical sections
+for (let i = 0; i < 3; i++) {
+  const radius = 2.45 - i * 0.58;
+  const height = 3.1;
+
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(radius, height, 48),
+    greenMaterials[i]
+  );
+
+  cone.position.y = -1.3 + i * 1.5;
+  tree.add(cone);
+}
+
+// Tree trunk
+const trunk = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.38, 0.48, 1.2, 24),
+  new THREE.MeshStandardMaterial({
+    color: 0x694126,
+    roughness: 0.9
+  })
+);
+
+trunk.position.y = -3;
+tree.add(trunk);
+
+// Base
+const base = new THREE.Mesh(
+  new THREE.CylinderGeometry(2.35, 2.5, 0.13, 64),
+  new THREE.MeshStandardMaterial({
+    color: 0x133d38,
+    metalness: 0.4,
+    roughness: 0.35
+  })
+);
+
+base.position.y = -3.65;
+tree.add(base);
+
+/* ====================================
+   5. GOLDEN STAR
+==================================== */
+
+function createStarShape() {
+  const shape = new THREE.Shape();
+  const outer = 0.48;
+  const inner = 0.21;
+
+  for (let i = 0; i < 10; i++) {
+    const a = i * Math.PI / 5 - Math.PI / 2;
+    const r = i % 2 === 0 ? outer : inner;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+
+  shape.closePath();
+  return shape;
+}
+
+const star = new THREE.Mesh(
+  new THREE.ExtrudeGeometry(createStarShape(), {
+    depth: 0.1,
+    bevelEnabled: true,
+    bevelThickness: 0.04,
+    bevelSize: 0.04,
+    bevelSegments: 2
+  }),
+  new THREE.MeshStandardMaterial({
+    color: 0xffd700,
+    emissive: 0xffb600,
+    emissiveIntensity: 1.7,
+    metalness: 0.65,
+    roughness: 0.18
+  })
+);
+
+star.position.set(0, 3.35, 0);
+star.userData.message = {
+  title: "⭐ Magical Star",
+  text: "Make a wish! May your Christmas be full of magic."
+};
+
+tree.add(star);
+
+const starLight = new THREE.PointLight(
+  0xffd700, 12, 6
+);
+starLight.position.y = 3.45;
+tree.add(starLight);
+
+/* ====================================
+   6. ORNAMENT MATERIALS
+==================================== */
+
+const red = 0xff3059;
+const gold = 0xffce45;
+const blue = 0x48cfff;
+const pink = 0xff86c8;
+
+const ornamentColors = [
+  red, gold, blue, pink, 0xb77aff
+];
+
+const ornamentMessages = [
+  ["❤️ Love Ornament", "Sending you love and Christmas hugs!"],
+  ["🎁 Surprise Gift", "A little surprise is waiting for you!"],
+  ["❄️ Snow Magic", "Every snowflake is a tiny winter miracle."],
+  ["🍬 Sweet Christmas", "May your holidays be extra sweet!"],
+  ["🌟 Lucky Ornament", "You found a lucky Christmas decoration!"],
+  ["🎄 Christmas Wish", "Wishing you joy, warmth, and happiness!"]
+];
+
+const ornaments = [];
+const clickableMeshes = [];
+
+function shinyMaterial(color) {
+  return new THREE.MeshStandardMaterial({
+    color,
+    metalness: 0.55,
+    roughness: 0.18,
+    emissive: color,
+    emissiveIntensity: 0.12
+  });
+}
+
+/* ====================================
+   7. CREATE INTERACTIVE ORNAMENTS
+==================================== */
+
+function addBauble(x, y, z, color, index) {
+  const group = new THREE.Group();
+
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(0.19, 24, 24),
+    shinyMaterial(color)
+  );
+
+  group.add(ball);
+
+  // Small golden cap
+  const cap = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.065, 0.065, 0.07, 16),
+    shinyMaterial(gold)
+  );
+
+  cap.position.y = 0.20;
+  group.add(cap);
+
+  // Hanging loop
+  const loop = new THREE.Mesh(
+    new THREE.TorusGeometry(0.065, 0.013, 8, 16),
+    shinyMaterial(gold)
+  );
+  loop.position.y = 0.265;
+  group.add(loop);
+
+  group.position.set(x, y, z);
+
+  registerOrnament(group, index);
+}
+
+/* Cute present */
+function addGift(x, y, z, index) {
+  const group = new THREE.Group();
+
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.35, 0.35, 0.35),
+    shinyMaterial(index % 2 ? pink : blue)
+  );
+
+  group.add(box);
+
+  const ribbonMaterial = shinyMaterial(gold);
+
+  const ribbon1 = new THREE.Mesh(
+    new THREE.BoxGeometry(0.065, 0.37, 0.37),
+    ribbonMaterial
+  );
+
+  const ribbon2 = new THREE.Mesh(
+    new THREE.BoxGeometry(0.37, 0.37, 0.065),
+    ribbonMaterial
+  );
+
+  group.add(ribbon1, ribbon2);
+
+  group.position.set(x, y, z);
+  registerOrnament(group, index);
+}
+
+/* Cute snowman */
+function addSnowman(x, y, z, index) {
+  const group = new THREE.Group();
+
+  const white = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.65
+  });
+
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(0.15, 20, 20),
+    white
+  );
+
+  body.position.y = -0.10;
+  group.add(body);
+
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(0.115, 20, 20),
+    white
+  );
+
+  head.position.y = 0.12;
+  group.add(head);
+
+  const black = new THREE.MeshStandardMaterial({
+    color: 0x111111
+  });
+
+  for (const eyeX of [-0.043, 0.043]) {
+    const eye = new THREE.Mesh(
+      new THREE.SphereGeometry(0.014, 8, 8),
+      black
+    );
+    eye.position.set(eyeX, 0.15, 0.105);
+    group.add(eye);
+  }
+
+  const nose = new THREE.Mesh(
+    new THREE.ConeGeometry(0.035, 0.12, 12),
+    shinyMaterial(0xff821c)
+  );
+  nose.rotation.x = Math.PI / 2;
+  nose.position.set(0, 0.105, 0.17);
+  group.add(nose);
+
+  // Tiny Santa hat
+  const hat = new THREE.Mesh(
+    new THREE.ConeGeometry(0.12, 0.22, 16),
+    shinyMaterial(red)
+  );
+  hat.position.y = 0.31;
+  group.add(hat);
+
+  group.position.set(x, y, z);
+  group.rotation.y = Math.atan2(x, z);
+
+  registerOrnament(group, index);
+}
+
+/* Store clickable ornament metadata */
+function registerOrnament(group, index) {
+  const [title, text] =
+    ornamentMessages[index % ornamentMessages.length];
+
+  group.userData.message = { title, text };
+  group.userData.bounce = 0;
+  group.userData.baseScale = group.scale.x;
+
+  tree.add(group);
+  ornaments.push(group);
+
+  group.traverse(child => {
+    if (child.isMesh) {
+      child.userData.ornamentRoot = group;
+      clickableMeshes.push(child);
+    }
+  });
+}
+
+/* ====================================
+   8. PLACE ORNAMENTS AROUND TREE
+==================================== */
+
+const ornamentCount = 40;
+
+for (let i = 0; i < ornamentCount; i++) {
+  const t = (i + 0.5) / ornamentCount;
+  const y = -2.7 + t * 5.5;
+
+  // Tapered radius approximating tree surface
+  const radius = 2.35 * (1 - t) + 0.08;
+
+  const angle = i * 2.399963; // Golden angle
+
+  const x = Math.cos(angle) * radius;
+  const z = Math.sin(angle) * radius;
+
+  if (i % 9 === 0) {
+    addSnowman(x, y, z, i);
+  } else if (i % 7 === 0) {
+    addGift(x, y, z, i);
+  } else {
+    addBauble(
+      x, y, z,
+      ornamentColors[i % ornamentColors.length],
+      i
+    );
+  }
+}
+
+clickableMeshes.push(star);
+
+/* ====================================
+   9. GLOWING FAIRY LIGHTS
+==================================== */
+
+const lights = [];
+const lightColors = [
+  0xffd35a, 0xff6384,
+  0x64ddff, 0xffffff,
+  0xb99aff
+];
+
+for (let i = 0; i < 260; i++) {
+  const t = i / 259;
+  const angle = t * Math.PI * 2 * 15;
+
+  const y = -2.8 + t * 5.9;
+  const radius = 2.3 * (1 - t) + 0.08;
+
+  const bulb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.045, 8, 8),
+    new THREE.MeshBasicMaterial({
+      color: lightColors[i % lightColors.length]
+    })
+  );
+
+  bulb.position.set(
+    Math.cos(angle) * radius,
+    y,
+    Math.sin(angle) * radius
+  );
+
+  bulb.userData.phase = i * 0.85;
+
+  lights.push(bulb);
+  tree.add(bulb);
+}
+
+/* ====================================
+   10. FALLING SNOW
+==================================== */
+
+const snowCount = 450;
+const positions = new Float32Array(snowCount * 3);
+
+for (let i = 0; i < snowCount; i++) {
+  positions[i * 3] = (Math.random() - 0.5) * 32;
+  positions[i * 3 + 1] = (Math.random() - 0.5) * 22;
+  positions[i * 3 + 2] = (Math.random() - 0.5) * 20;
+}
+
+const snowGeometry = new THREE.BufferGeometry();
+snowGeometry.setAttribute(
+  "position",
+  new THREE.BufferAttribute(positions, 3)
+);
+
+const snow = new THREE.Points(
+  snowGeometry,
+  new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 0.065,
+    transparent: true,
+    opacity: 0.75
+  })
+);
+
+scene.add(snow);
+
+/* ====================================
+   11. CLICK ORNAMENTS WITH RAYCASTING
+==================================== */
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+
+let pointerDownX = 0;
+let pointerDownY = 0;
+
+const popup = document.getElementById("popup");
+let popupTimeout;
+
+renderer.domElement.addEventListener("pointerdown", e => {
+  pointerDownX = e.clientX;
+  pointerDownY = e.clientY;
+});
+
+renderer.domElement.addEventListener("pointerup", e => {
+  // Ignore dragging; only respond to genuine clicks
+  if (
+    Math.hypot(
+      e.clientX - pointerDownX,
+      e.clientY - pointerDownY
+    ) > 6
+  ) return;
+
+  pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(pointer, camera);
+
+  const hits = raycaster.intersectObjects(
+    clickableMeshes, false
+  );
+
+  if (hits.length === 0) return;
+
+  const object = hits[0].object;
+
+  const root =
+    object.userData.ornamentRoot || object;
+
+  const message = root.userData.message;
+
+  if (!message) return;
+
+  root.userData.bounce = 1;
+
+  document.getElementById("popupTitle").textContent =
+    message.title;
+
+  document.getElementById("popupText").textContent =
+    message.text;
+
+  popup.style.display = "block";
+
+  clearTimeout(popupTimeout);
+
+  popupTimeout = setTimeout(() => {
+    popup.style.display = "none";
+  }, 2800);
+});
+
+// Show pointer cursor over ornaments
+renderer.domElement.addEventListener("pointermove", e => {
+  pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(pointer, camera);
+
+  const hits = raycaster.intersectObjects(
+    clickableMeshes, false
+  );
+
+  renderer.domElement.style.cursor =
+    hits.length ? "pointer" : "grab";
+});
+
+/* ====================================
+   12. INTERACTIVE BUTTONS
+==================================== */
+
+document.getElementById("rotationBtn")
+  .addEventListener("click", function() {
+
+    controls.autoRotate = !controls.autoRotate;
+
+    this.textContent = controls.autoRotate
+      ? "Pause Rotation"
+      : "Resume Rotation";
+  });
+
+let lightsEnabled = true;
+
+document.getElementById("lightsBtn")
+  .addEventListener("click", function() {
+    lightsEnabled = !lightsEnabled;
+
+    this.textContent = lightsEnabled
+      ? "Lights: ON"
+      : "Lights: OFF";
+
+    starLight.intensity = lightsEnabled ? 12 : 0;
+  });
+
+document.getElementById("resetBtn")
+  .addEventListener("click", () => {
+    camera.position.set(0, 1.2, 11);
+    controls.target.set(0, 0.3, 0);
+    controls.update();
+  });
+
+/* ====================================
+   13. ANIMATION LOOP
+==================================== */
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const time = clock.getElapsedTime();
+
+  controls.update();
+
+  // Twinkling lights
+  lights.forEach(bulb => {
+    const phase = bulb.userData.phase;
+
+    const glow = lightsEnabled
+      ? 0.65 + Math.sin(time * 3.5 + phase) * 0.35
+      : 0.04;
+
+    bulb.material.color.setScalar(glow);
+
+    bulb.scale.setScalar(
+      lightsEnabled
+        ? 0.9 + 0.3 * Math.sin(time * 3 + phase)
+        : 0.6
+    );
+  });
+
+  // Pulsing golden star
+  star.material.emissiveIntensity = lightsEnabled
+    ? 1.5 + Math.sin(time * 2) * 0.5
+    : 0.1;
+
+  // Ornaments bounce when clicked
+  ornaments.forEach(group => {
+    if (group.userData.bounce > 0) {
+      group.userData.bounce = Math.max(
+        0,
+        group.userData.bounce - 0.025
+      );
+
+      const b = group.userData.bounce;
+
+      const scale =
+        1 + Math.abs(Math.sin((1 - b) * 18)) * b * 0.8;
+
+      group.scale.setScalar(scale);
+    } else {
+      group.scale.setScalar(1);
+    }
+  });
+
+  // Animate the snow
+  const p = snowGeometry.attributes.position;
+
+  for (let i = 0; i < snowCount; i++) {
+    let y = p.getY(i);
+    y -= 0.012 + (i % 5) * 0.003;
+
+    if (y < -11) y = 11;
+
+    p.setY(i, y);
+  }
+
+  p.needsUpdate = true;
+
+  // Slowly spin the golden star
+  star.rotation.y = time * 0.5;
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* ====================================
+   14. RESPONSIVE RESIZING
+==================================== */
+
+window.addEventListener("resize", () => {
+  camera.aspect =
+    window.innerWidth / window.innerHeight;
+
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+  );
+});
+
+</script>
+</body>
+</html>
