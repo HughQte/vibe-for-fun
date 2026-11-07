@@ -1,0 +1,179 @@
+<!-- Making a Christmas Tree
+Using HTML, CSS, and JavaScript -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Magical Christmas Tree</title>
+<style>
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: radial-gradient(
+      ellipse at center, #12334a, #050c19 75%
+    );
+    display: flex;
+    align-items: center;  
+    justify-content: center;
+    font-family: Arial, sans-serif;
+  }
+
+  .scene {
+    width: 400px;
+    height: 550px;
+    perspective: 900px;
+  }
+
+  .tree {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    animation: spin 12s linear infinite;
+  }
+
+  @keyframes spin {
+    from { transform: rotateY(0deg); }
+    to { transform: rotateY(360deg); }
+  }
+
+  .branch, .light {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    border-radius: 50%;
+    transform-style: preserve-3d;
+  }
+
+  .branch {
+    width: 6px;
+    height: 6px;
+    background: #16db85;
+    box-shadow: 0 0 9px #00ff88;
+  }
+
+  .light {
+    width: 7px;
+    height: 7px;
+    box-shadow: 0 0 12px currentColor,
+                0 0 25px currentColor;
+    animation: twinkle 1.8s ease-in-out infinite alternate;
+  }
+
+  @keyframes twinkle {
+    from { opacity: .35; filter: brightness(.7); }
+    to { opacity: 1; filter: brightness(2); }
+  }
+
+  .star {
+    position: absolute;
+    left: 50%;
+    top: 40px;
+    font-size: 54px;
+    color: gold;
+    transform: translateX(-50%);
+    text-shadow: 0 0 20px gold,
+                 0 0 45px orange,
+                 0 0 75px yellow;
+    animation: starGlow 1.3s infinite alternate;
+  }
+
+  @keyframes starGlow {
+    to { filter: brightness(1.8); }
+  }
+
+  .snow {
+    position: fixed;
+    top: -15px;
+    color: white;
+    pointer-events: none;
+    animation: snowfall linear infinite;
+  }
+
+  @keyframes snowfall {
+    to { transform: translateY(110vh); }
+  }
+
+  .message {
+    position: fixed;
+    bottom: 35px;
+    color: #ffe9a3;
+    font-size: 28px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    text-shadow: 0 0 15px gold;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="scene">
+  <div class="tree" id="tree">
+    <div class="star">★</div>
+  </div>
+</div>
+
+<div class="message">🎄 Merry Christmas 🎄</div>
+
+<script>
+  const tree = document.getElementById("tree");
+  const colors = [
+    "#ff3333", "#ffe600", "#00ddff",
+    "#ff55ff", "#ffffff", "#ff9900"
+  ];
+
+  // Build a glowing 3D spiral tree
+  const total = 1600;
+  const turns = 18;
+  const height = 390;
+
+  for (let i = 0; i < total; i++) {
+    const t = i / (total - 1);
+    const angle = t * Math.PI * 2 * turns;
+    const radius = 155 * t;
+    const y = -205 + t * height;
+
+    const x = Math.cos(angle) * radius;
+    const z = Math.sin(angle) * radius;
+
+    const dot = document.createElement("div");
+    const isLight = i % 9 === 0;
+
+    dot.className = isLight ? "light" : "branch";
+
+    if (isLight) {
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      dot.style.background = color;
+      dot.style.color = color;
+      dot.style.animationDelay = Math.random() * 2 + "s";
+    }
+
+    dot.style.transform =
+      `translate3d(${x}px, ${y}px, ${z}px)`;
+
+    tree.appendChild(dot);
+  }
+
+  // Falling snow
+  for (let i = 0; i < 100; i++) {
+    const snow = document.createElement("div");
+    snow.className = "snow";
+    snow.textContent = "❄";
+
+    snow.style.left = Math.random() * 100 + "vw";
+    snow.style.fontSize = 5 + Math.random() * 15 + "px";
+    snow.style.opacity = .3 + Math.random() * .7;
+    snow.style.animationDuration = 4 + Math.random() * 8 + "s";
+    snow.style.animationDelay = -Math.random() * 12 + "s";
+
+    document.body.appendChild(snow);
+  }
+</script>
+
+</body>
+</html>
