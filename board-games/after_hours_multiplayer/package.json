@@ -1,0 +1,9 @@
+{
+  "name": "after-hours-multiplayer",
+  "version": "3.0.0",
+  "private": true,
+  "description": "A realtime 18+ party card game for phones and computers",
+  "scripts": {"start": "node server.js"},
+  "engines": {"node": ">=18"},
+  "license": "UNLICENSED"
+}
