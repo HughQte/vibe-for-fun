@@ -47,3 +47,7 @@ In the lobby, host selects **Add a card**, sets category and intensity, and save
 - No account system; invite links are effectively room invitations. Share only with your intended group.
 - Age 18+; all challenges consensual, with skips and nonalcoholic choices. No drinking is required.
 - One web server process only; do not deploy in a multi-instance environment without shared storage/pub-sub.
+
+## 🎮 Play After Hours Multiplayer
+
+[Play the game online](https://vibe-for-fun.onrender.com)
