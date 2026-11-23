@@ -1,4 +1,4 @@
-# After Hours 18+ — Realtime Multiplayer
+# After Hours 21+ — Realtime Multiplayer
 
 A responsive browser-based party card game. Every player joins **the same room** on their own phone/computer. The server synchronizes player order, face-down cards, live reveals and turn changes. No app installation or database required.
 
